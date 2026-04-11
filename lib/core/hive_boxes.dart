@@ -16,8 +16,13 @@ const String settingsBoxName = 'settings';
 const String lastBackupDateKey = 'lastBackupDate';
 const String remindersEnabledKey = 'remindersEnabled';
 
+bool _hiveInitialized = false;
+
 Future<void> initHive() async {
-  await Hive.initFlutter();
+  if (!_hiveInitialized) {
+    await Hive.initFlutter();
+    _hiveInitialized = true;
+  }
 
   if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter(EmployeeAdapter());
   if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(EventAdapter());
@@ -40,10 +45,22 @@ Future<void> initHive() async {
     Hive.registerAdapter(ShiftOutcomeAdapter());
   }
 
-  await Hive.openBox<Employee>(employeesBoxName);
-  await Hive.openBox<Event>(eventsBoxName);
-  await Hive.openBox<RoleSlot>(roleSlotsBoxName);
-  await Hive.openBox<ShiftLog>(shiftLogsBoxName);
-  await Hive.openBox<Client>(clientsBoxName);
-  await Hive.openBox<String>(settingsBoxName);
+  if (!Hive.isBoxOpen(employeesBoxName)) {
+    await Hive.openBox<Employee>(employeesBoxName);
+  }
+  if (!Hive.isBoxOpen(eventsBoxName)) {
+    await Hive.openBox<Event>(eventsBoxName);
+  }
+  if (!Hive.isBoxOpen(roleSlotsBoxName)) {
+    await Hive.openBox<RoleSlot>(roleSlotsBoxName);
+  }
+  if (!Hive.isBoxOpen(shiftLogsBoxName)) {
+    await Hive.openBox<ShiftLog>(shiftLogsBoxName);
+  }
+  if (!Hive.isBoxOpen(clientsBoxName)) {
+    await Hive.openBox<Client>(clientsBoxName);
+  }
+  if (!Hive.isBoxOpen(settingsBoxName)) {
+    await Hive.openBox<String>(settingsBoxName);
+  }
 }

@@ -26,15 +26,8 @@ class NotificationScheduler {
     importance: Importance.high,
   );
 
-  static bool _initialized = false;
-
   static Future<void> initNotifications() async {
     if (kIsWeb) {
-      _initialized = true;
-      return;
-    }
-
-    if (_initialized) {
       return;
     }
 
@@ -54,8 +47,6 @@ class NotificationScheduler {
 
     await androidPlugin?.createNotificationChannel(_channel);
     await androidPlugin?.requestNotificationsPermission();
-
-    _initialized = true;
   }
 
   static Future<void> scheduleEventReminder(Event event) async {
