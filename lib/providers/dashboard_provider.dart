@@ -9,7 +9,7 @@ import '../models/shift_log.dart';
 import 'event_provider.dart';
 
 final StreamProvider<List<RoleSlot>> roleSlotsStreamProvider =
-    StreamProvider<List<RoleSlot>>((StreamProviderRef<List<RoleSlot>> ref) async* {
+    StreamProvider<List<RoleSlot>>((Ref ref) async* {
       final Box<RoleSlot> box = Hive.box<RoleSlot>(roleSlotsBoxName);
       yield box.values.toList();
       await for (final BoxEvent _ in box.watch()) {
@@ -18,7 +18,7 @@ final StreamProvider<List<RoleSlot>> roleSlotsStreamProvider =
     });
 
 final StreamProvider<List<ShiftLog>> shiftLogsStreamProvider =
-    StreamProvider<List<ShiftLog>>((StreamProviderRef<List<ShiftLog>> ref) async* {
+    StreamProvider<List<ShiftLog>>((Ref ref) async* {
       final Box<ShiftLog> box = Hive.box<ShiftLog>(shiftLogsBoxName);
       yield box.values.toList();
       await for (final BoxEvent _ in box.watch()) {
@@ -27,7 +27,7 @@ final StreamProvider<List<ShiftLog>> shiftLogsStreamProvider =
     });
 
 final StreamProvider<String?> settingsLastBackupDateProvider =
-    StreamProvider<String?>((StreamProviderRef<String?> ref) async* {
+    StreamProvider<String?>((Ref ref) async* {
       final Box<String> box = Hive.box<String>(settingsBoxName);
       yield box.get(lastBackupDateKey);
       await for (final BoxEvent _ in box.watch()) {

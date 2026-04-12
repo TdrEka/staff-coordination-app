@@ -104,7 +104,7 @@ class RoleSlotTile extends StatelessWidget {
     if (criticalUncovered) {
       card = Container(
         decoration: BoxDecoration(
-          color: AppTheme.error.withOpacity(0.08),
+          color: AppTheme.error.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
         ),
         child: card,

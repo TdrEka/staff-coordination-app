@@ -80,7 +80,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           title: Text(l10n.eventsTitle),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).maybePop(),
+            onPressed: () => context.pop(),
           ),
         ),
         body: const Center(child: Text('Evento no encontrado')),
@@ -132,7 +132,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
               margin: const EdgeInsets.only(top: 12),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.12),
+                color: Colors.red.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: Colors.red),
               ),
@@ -420,7 +420,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                       children: <Widget>[
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
+                            onPressed: () => context.pop(),
                             child: Text(l10n.cancel),
                           ),
                         ),
@@ -453,7 +453,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                 setState(_loadSlots);
                               }
                               if (context.mounted) {
-                                Navigator.of(context).pop();
+                                context.pop();
                               }
                             },
                             child: Text(isEditing ? l10n.save : l10n.eventsAdd),

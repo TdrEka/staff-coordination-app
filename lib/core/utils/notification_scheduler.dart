@@ -14,7 +14,9 @@ import '../../repositories/role_slot_repository.dart';
 class NotificationScheduler {
   NotificationScheduler._();
 
-  static final FlutterLocalNotificationsPlugin _notifications =
+  static final NotificationScheduler instance = NotificationScheduler._();
+
+  static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
   static final RoleSlotRepository _roleSlotRepository = RoleSlotRepository();
   static final EventRepository _eventRepository = EventRepository();
@@ -26,7 +28,7 @@ class NotificationScheduler {
     importance: Importance.high,
   );
 
-  static Future<void> initNotifications() async {
+  Future<void> initNotifications() async {
     if (kIsWeb) {
       return;
     }
@@ -39,13 +41,23 @@ class NotificationScheduler {
       android: androidSettings,
     );
 
-    await _notifications.initialize(initSettings);
+    try {
+      await _notificationsPlugin.initialize(initSettings);
+    } catch (_) {
+      // Saved schedule payload may be incompatible after upgrades; wipe and retry.
+      try {
+        await _notificationsPlugin.cancelAll();
+      } catch (_) {}
+      await _notificationsPlugin.initialize(initSettings);
+    }
 
     final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
-        _notifications.resolvePlatformSpecificImplementation<
+        _notificationsPlugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
 
     await androidPlugin?.createNotificationChannel(_channel);
+
+    // Request notification permission on Android 13+.
     await androidPlugin?.requestNotificationsPermission();
   }
 
@@ -54,12 +66,12 @@ class NotificationScheduler {
       return;
     }
 
-    await initNotifications();
+    await instance.initNotifications();
 
     final bool enabled = _areRemindersEnabled();
     final int notificationId = _eventNotificationId(event.id);
     if (!enabled) {
-      await _notifications.cancel(notificationId);
+      await _notificationsPlugin.cancel(notificationId);
       return;
     }
 
@@ -68,7 +80,7 @@ class NotificationScheduler {
         .where((RoleSlot slot) => slot.status == SlotStatus.uncovered)
         .length;
     if (uncoveredCount <= 0) {
-      await _notifications.cancel(notificationId);
+      await _notificationsPlugin.cancel(notificationId);
       return;
     }
 
@@ -82,11 +94,11 @@ class NotificationScheduler {
     ).subtract(const Duration(days: 2));
 
     if (triggerAt.isBefore(tz.TZDateTime.now(tz.local))) {
-      await _notifications.cancel(notificationId);
+      await _notificationsPlugin.cancel(notificationId);
       return;
     }
 
-    await _notifications.zonedSchedule(
+    await _notificationsPlugin.zonedSchedule(
       notificationId,
       'Event tomorrow: ${event.title}',
       '$uncoveredCount uncovered slots — check the roster',
@@ -112,8 +124,8 @@ class NotificationScheduler {
       return;
     }
 
-    await initNotifications();
-    await _notifications.cancel(_eventNotificationId(eventId));
+    await instance.initNotifications();
+    await _notificationsPlugin.cancel(_eventNotificationId(eventId));
   }
 
   static Future<void> cancelAllReminders() async {
@@ -121,8 +133,8 @@ class NotificationScheduler {
       return;
     }
 
-    await initNotifications();
-    await _notifications.cancelAll();
+    await instance.initNotifications();
+    await _notificationsPlugin.cancelAll();
   }
 
   static Future<void> refreshAllEventReminders() async {
@@ -130,7 +142,7 @@ class NotificationScheduler {
       return;
     }
 
-    await initNotifications();
+    await instance.initNotifications();
 
     if (!_areRemindersEnabled()) {
       await cancelAllReminders();

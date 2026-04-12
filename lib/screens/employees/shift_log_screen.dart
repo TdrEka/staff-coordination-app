@@ -156,6 +156,9 @@ class _ShiftLogScreenState extends ConsumerState<ShiftLogScreen> {
           final ShiftLog? existingLog =
               _shiftLogRepository.getMostRecentByEmployeeAndEvent(employee.id, event.id);
           if (existingLog != null) {
+            if (!context.mounted) {
+              return;
+            }
             final bool addAnother = await ConfirmDialog.ask(
               context,
               title: 'Registro existente',
@@ -164,6 +167,9 @@ class _ShiftLogScreenState extends ConsumerState<ShiftLogScreen> {
               confirmLabel: 'Anadir',
               cancelLabel: 'Omitir',
             );
+            if (!context.mounted) {
+              return;
+            }
             if (!addAnother) {
               continue;
             }
@@ -174,13 +180,14 @@ class _ShiftLogScreenState extends ConsumerState<ShiftLogScreen> {
           employee.reliabilityScore = applyDelta(employee.reliabilityScore, delta);
           await ref.read(employeesProvider.notifier).update(employee);
         }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Registros guardados')),
-          );
-          context.pop();
+        if (!context.mounted) {
+          return;
         }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registros guardados')),
+        );
+        context.pop();
       },
     );
   }
@@ -306,12 +313,15 @@ class _ShiftLogScreenState extends ConsumerState<ShiftLogScreen> {
             ],
           ),
           actions: <Widget>[
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
-            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.save)),
+            TextButton(onPressed: () => context.pop(false), child: Text(l10n.cancel)),
+            FilledButton(onPressed: () => context.pop(true), child: Text(l10n.save)),
           ],
         );
       },
     );
+    if (!context.mounted) {
+      return;
+    }
 
     if (confirmed != true) {
       return;
@@ -321,7 +331,7 @@ class _ShiftLogScreenState extends ConsumerState<ShiftLogScreen> {
     final String reason = reasonController.text.trim();
 
     if (requested == null || reason.isEmpty) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Introduce una puntuación válida y un motivo.')),
         );
@@ -467,7 +477,7 @@ class _PostEventBodyState extends State<_PostEventBody> {
                               Text(employee.name, style: Theme.of(context).textTheme.titleMedium),
                               const SizedBox(height: 8),
                               DropdownButtonFormField<ShiftOutcome>(
-                                value: draft.outcome,
+                                initialValue: draft.outcome,
                                 decoration: const InputDecoration(labelText: 'Resultado'),
                                 items: <DropdownMenuItem<ShiftOutcome>>[
                                   DropdownMenuItem(

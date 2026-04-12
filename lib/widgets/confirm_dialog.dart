@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:staff_coordination_app/l10n/app_localizations.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/theme.dart';
 
@@ -31,7 +32,7 @@ class ConfirmDialog extends StatelessWidget {
       content: Text(message),
       actions: <Widget>[
         TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => context.pop(false),
           style: TextButton.styleFrom(foregroundColor: AppTheme.onSurfaceVariant),
           child: Text(
             cancelLabel.isEmpty ? l10n.cancel : cancelLabel,
@@ -43,7 +44,7 @@ class ConfirmDialog extends StatelessWidget {
             backgroundColor: AppTheme.error,
             foregroundColor: AppTheme.onPrimary,
           ),
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => context.pop(true),
           child: Text(
             confirmLabel.isEmpty ? l10n.confirm : confirmLabel,
             style: Theme.of(context).textTheme.labelLarge,

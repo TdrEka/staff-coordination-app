@@ -158,7 +158,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _eventType,
+              initialValue: _eventType,
               decoration: InputDecoration(labelText: l10n.eventsType),
               items: <DropdownMenuItem<String>>[
                 DropdownMenuItem<String>(value: 'wedding', child: Text(l10n.eventsTypeWedding)),
@@ -238,7 +238,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<EventStatus>(
-              value: _status,
+              initialValue: _status,
               decoration: const InputDecoration(labelText: 'Estado'),
               items: EventStatus.values
                   .map(
@@ -429,11 +429,11 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
           content: Text(AppLocalizations.of(context)!.validationPastDateWarning),
           actions: <Widget>[
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: () => context.pop(false),
               child: Text(AppLocalizations.of(context)!.cancel),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () => context.pop(true),
               child: Text(AppLocalizations.of(context)!.confirm),
             ),
           ],

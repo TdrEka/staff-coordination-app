@@ -114,8 +114,18 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       _initialized = true;
     }
 
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
+        if (didPop) {
+          return;
+        }
+        final bool discard = await _confirmDiscard();
+        if (!discard || !context.mounted) {
+          return;
+        }
+        context.pop();
+      },
       child: Scaffold(
         appBar: AppBar(
           title: Text(_editingEmployee == null ? l10n.employeesAdd : l10n.edit),
@@ -170,7 +180,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<PreferredContact>(
-                value: _preferredContact,
+                initialValue: _preferredContact,
                 decoration: InputDecoration(labelText: l10n.employeesPreferredContact),
                 items: PreferredContact.values
                     .map(
@@ -225,7 +235,7 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<ContractType>(
-                value: _contractType,
+                initialValue: _contractType,
                 decoration: InputDecoration(labelText: l10n.employeesContractType),
                 items: ContractType.values
                     .map(
@@ -384,14 +394,14 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
       context: context,
       initialTime: model.start ?? const TimeOfDay(hour: 9, minute: 0),
     );
-    if (start == null || !mounted) {
+    if (start == null || !context.mounted) {
       return;
     }
     final TimeOfDay? end = await showTimePicker(
       context: context,
       initialTime: model.end ?? const TimeOfDay(hour: 17, minute: 0),
     );
-    if (end == null) {
+    if (end == null || !context.mounted) {
       return;
     }
     setState(() {
@@ -401,17 +411,10 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     });
   }
 
-  Future<bool> _onWillPop() async {
-    if (!_dirty) {
-      return true;
-    }
-    return _confirmDiscard();
-  }
-
   Future<void> _onCancelPressed() async {
     if (!_dirty || await _confirmDiscard()) {
       if (mounted) {
-        Navigator.of(context).pop();
+        context.pop();
       }
     }
   }
@@ -424,8 +427,8 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
           title: const Text('¿Descartar cambios?'),
           content: const Text('Tienes cambios sin guardar.'),
           actions: <Widget>[
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Seguir editando')),
-            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Descartar')),
+            TextButton(onPressed: () => context.pop(false), child: const Text('Seguir editando')),
+            FilledButton(onPressed: () => context.pop(true), child: const Text('Descartar')),
           ],
         );
       },
@@ -465,10 +468,11 @@ class _EmployeeFormScreenState extends ConsumerState<EmployeeFormScreen> {
     } else {
       await notifier.update(employee);
     }
-
-    if (mounted) {
-      context.go('/employees/${employee.id}');
+    if (!mounted) {
+      return;
     }
+
+    context.go('/employees/${employee.id}');
   }
 
   void _seedForm(Employee? employee) {

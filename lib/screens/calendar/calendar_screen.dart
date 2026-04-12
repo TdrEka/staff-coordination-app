@@ -165,7 +165,7 @@ class DayDetailBottomSheet extends ConsumerWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => context.pop(),
                     icon: const Icon(Icons.close),
                   ),
                 ],
@@ -199,7 +199,7 @@ class DayDetailBottomSheet extends ConsumerWidget {
                           ),
                           trailing: StatusChip.event(eventStatus: event.status),
                           onTap: () {
-                            Navigator.of(context).pop();
+                            context.pop();
                             context.go('/events/${event.id}');
                           },
                         );
@@ -221,7 +221,7 @@ class DayDetailBottomSheet extends ConsumerWidget {
       actionLabel: AppLocalizations.of(context)!.calendarAddEvent,
       icon: Icons.event_note_outlined,
       onAction: () {
-        Navigator.of(context).pop();
+        context.pop();
         context.go('/events/add?date=$isoDay');
       },
     );

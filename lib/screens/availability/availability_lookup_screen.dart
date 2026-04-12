@@ -245,7 +245,7 @@ class _AvailabilityLookupScreenState extends ConsumerState<AvailabilityLookupScr
     await widget.onAssignSelected!(employee);
 
     if (mounted && widget.asBottomSheet) {
-      Navigator.of(context).pop();
+      context.pop();
     }
   }
 

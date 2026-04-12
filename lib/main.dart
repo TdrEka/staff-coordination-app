@@ -13,14 +13,20 @@ Future<void> main() async {
 
   try {
     await initHive();
-    await NotificationScheduler.initNotifications();
-    await NotificationScheduler.refreshAllEventReminders();
 
     runApp(
       const ProviderScope(
         child: _LifecycleRoot(child: StaffCoordinationApp()),
       ),
     );
+
+    // Notifications init after app starts so plugin state issues are non-fatal.
+    try {
+      await NotificationScheduler.instance.initNotifications();
+      await NotificationScheduler.refreshAllEventReminders();
+    } catch (_) {
+      // Notifications unavailable; app continues without reminders.
+    }
   } catch (e) {
     runApp(
       MaterialApp(

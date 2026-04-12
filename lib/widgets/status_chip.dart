@@ -59,7 +59,7 @@ class StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: ShapeDecoration(
-        color: resolvedColor.withOpacity(0.15),
+        color: resolvedColor.withValues(alpha: 0.15),
         shape: const StadiumBorder(),
       ),
       child: Text(

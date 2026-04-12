@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:staff_coordination_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -45,7 +46,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final AppLocalizations l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.settingsTitle)),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+        ),
+        title: Text(l10n.settingsTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
@@ -342,6 +355,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       String raw;
       if (picked.path != null) {
         raw = await File(picked.path!).readAsString();
+        if (!mounted) {
+          return;
+        }
       } else if (picked.bytes != null) {
         raw = utf8.decode(picked.bytes!);
       } else {
@@ -390,7 +406,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         context,
         title: l10n.importWarningTitle,
         message:
-            'Esta copia contiene ${employeesRaw.length} personas, ${eventsRaw.length} eventos y ${logsRaw.length} registros.\nEsto reemplazará todos los datos actuales. ¿Continuar?',
+            '${l10n.importSummary(employeesRaw.length, eventsRaw.length, logsRaw.length)}\n${l10n.importWarningMessage}',
         confirmLabel: l10n.settingsImport,
       );
       if (!mounted) {
@@ -572,11 +588,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           actions: <Widget>[
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: () => context.pop(false),
               child: Text(l10n.cancel),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(controller.text.trim() == 'DELETE'),
+              onPressed: () => context.pop(controller.text.trim() == 'DELETE'),
               child: Text(l10n.delete),
             ),
           ],
