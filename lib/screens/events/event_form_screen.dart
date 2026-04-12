@@ -48,7 +48,20 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   String? _eventType;
 
   bool _initialized = false;
+  bool _notFoundConfirmed = false;
   Event? _editingEvent;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_initialized) {
+        setState(() {
+          _notFoundConfirmed = true;
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -71,14 +84,61 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     final AppLocalizations l10n = AppLocalizations.of(context)!;
     final Event? fromState = widget.eventId == null
         ? null
-        : ref.read(eventsProvider.notifier).getById(widget.eventId!);
+        : ref.watch(
+            eventsProvider.select((List<Event> events) {
+              for (final Event candidate in events) {
+                if (candidate.id == widget.eventId) {
+                  return candidate;
+                }
+              }
+              return null;
+            }),
+          );
 
     final Event? source = widget.event ?? fromState;
 
-    if (!_initialized) {
+    if (!_initialized && widget.eventId == null) {
       _seed(source);
       _editingEvent = source;
       _initialized = true;
+    }
+
+    if (!_initialized && source != null) {
+      _seed(source);
+      _editingEvent = source;
+      _initialized = true;
+    }
+
+    // If we're in edit mode but the event can't be found, show a recovery screen.
+    if (widget.eventId != null && !_initialized && source == null) {
+      // Give Riverpod one frame to populate state before declaring not found.
+      if (_notFoundConfirmed) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Editar evento')),
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Icon(Icons.event_busy_outlined, size: 48),
+                const SizedBox(height: 16),
+                const Text('Evento no encontrado'),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => context.pop(),
+                  child: const Text('Volver'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+
+    if (!_initialized && widget.eventId != null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.edit)),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Scaffold(

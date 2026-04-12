@@ -23,6 +23,7 @@ class ShiftLogAdapter extends TypeAdapter<ShiftLog> {
       outcome: fields[3] as ShiftOutcome,
       minutesLate: fields[4] as int?,
       notes: fields[5] as String?,
+      scoreBeforeLog: fields[8] == null ? 0.0 : fields[8] as double,
       scoreDelta: fields[6] as double,
       loggedAt: fields[7] as String,
     );
@@ -31,7 +32,7 @@ class ShiftLogAdapter extends TypeAdapter<ShiftLog> {
   @override
   void write(BinaryWriter writer, ShiftLog obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class ShiftLogAdapter extends TypeAdapter<ShiftLog> {
       ..writeByte(6)
       ..write(obj.scoreDelta)
       ..writeByte(7)
-      ..write(obj.loggedAt);
+      ..write(obj.loggedAt)
+      ..writeByte(8)
+      ..write(obj.scoreBeforeLog);
   }
 
   @override

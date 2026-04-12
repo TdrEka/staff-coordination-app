@@ -1,22 +1,44 @@
-import 'package:hive/hive.dart';
-
 import '../../models/employee.dart';
 import '../../models/enums.dart';
 import '../../models/event.dart';
 import '../../models/role_slot.dart';
 
-bool hasConflict(Employee employee, Event targetEvent, List<RoleSlot> allSlots) {
-  return getConflictingEvent(employee, targetEvent, allSlots) != null;
+bool hasConflict(
+  Employee employee,
+  Event targetEvent,
+  List<RoleSlot> allSlots,
+  List<Event> allEvents, {
+  String? excludeSlotId,
+}) {
+  return getConflictingEvent(
+        employee,
+        targetEvent,
+        allSlots,
+        allEvents,
+        excludeSlotId: excludeSlotId,
+      ) !=
+      null;
 }
 
-Event? getConflictingEvent(Employee employee, Event targetEvent, List<RoleSlot> allSlots) {
-  final Box<Event> eventsBox = Hive.box<Event>('events');
+Event? getConflictingEvent(
+  Employee employee,
+  Event targetEvent,
+  List<RoleSlot> allSlots,
+  List<Event> allEvents, {
+  String? excludeSlotId,
+}) {
+  final Map<String, Event> eventsById = <String, Event>{
+    for (final Event event in allEvents) event.id: event,
+  };
 
   final DateTime targetDate = _dateOnly(_safeDate(targetEvent.date));
   final int targetStart = _toMinutes(targetEvent.startTime);
   final int targetEnd = _toMinutes(targetEvent.endTime);
 
   for (final RoleSlot slot in allSlots) {
+    if (excludeSlotId != null && slot.id == excludeSlotId) {
+      continue;
+    }
     if (slot.assignedEmployeeId != employee.id) {
       continue;
     }
@@ -24,7 +46,7 @@ Event? getConflictingEvent(Employee employee, Event targetEvent, List<RoleSlot> 
       continue;
     }
 
-    final Event? slotEvent = eventsBox.get(slot.eventId);
+    final Event? slotEvent = eventsById[slot.eventId];
     if (slotEvent == null) {
       continue;
     }

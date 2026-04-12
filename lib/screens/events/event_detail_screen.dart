@@ -63,11 +63,26 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final AppLocalizations l10n = AppLocalizations.of(context)!;
-    final Event? event = ref.read(eventsProvider.notifier).getById(widget.eventId);
+    final Event? event = ref.watch(
+      eventsProvider.select((List<Event> events) {
+        for (final Event candidate in events) {
+          if (candidate.id == widget.eventId) {
+            return candidate;
+          }
+        }
+        return null;
+      }),
+    );
 
     if (event == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.eventsTitle)),
+        appBar: AppBar(
+          title: Text(l10n.eventsTitle),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+        ),
         body: const Center(child: Text('Evento no encontrado')),
       );
     }
@@ -461,6 +476,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
   Future<void> _showAssignBottomSheet(Event event, RoleSlot slot) async {
     final List<RoleSlot> allSlots = _roleSlotRepository.getAll();
+    final List<Event> allEvents = ref.read(eventsProvider);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -470,6 +486,8 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
           targetEvent: event,
           initialRole: slot.roleType,
           allSlots: allSlots,
+          allEvents: allEvents,
+          excludeSlotId: slot.id,
           onAssignSelected: (Employee employee) async {
             final RoleSlot updated = RoleSlot(
               id: slot.id,

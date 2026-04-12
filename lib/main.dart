@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 
@@ -9,8 +9,9 @@ import 'core/hive_boxes.dart';
 import 'core/utils/notification_scheduler.dart';
 
 Future<void> main() async {
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
     await initHive();
     await NotificationScheduler.initNotifications();
     await NotificationScheduler.refreshAllEventReminders();
@@ -20,9 +21,59 @@ Future<void> main() async {
         child: _LifecycleRoot(child: StaffCoordinationApp()),
       ),
     );
-  }, (Object error, StackTrace stack) {
-    debugPrint('FATAL: $error\n$stack');
-  });
+  } catch (e) {
+    runApp(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: const Color(0xFF1A1612),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 56,
+                    color: Color(0xFFC9A96E),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Error al iniciar la app',
+                    style: TextStyle(
+                      color: Color(0xFFEDE0CF),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Hubo un problema al cargar los datos.\nPor favor cierra la app y vuelve a abrirla.',
+                    style: TextStyle(
+                      color: Color(0xFFA89880),
+                      fontSize: 15,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    e.toString(),
+                    style: const TextStyle(
+                      color: Color(0xFF7A7068),
+                      fontSize: 11,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _LifecycleRoot extends StatefulWidget {

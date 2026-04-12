@@ -6,9 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:staff_coordination_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
+import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/hive_boxes.dart';
 import '../../core/utils/notification_scheduler.dart';
@@ -263,38 +264,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
 
     try {
-      final Box<Employee> employeesBox = Hive.box<Employee>(employeesBoxName);
-      final Box<Event> eventsBox = Hive.box<Event>(eventsBoxName);
-      final Box<RoleSlot> slotsBox = Hive.box<RoleSlot>(roleSlotsBoxName);
-      final Box<ShiftLog> logsBox = Hive.box<ShiftLog>(shiftLogsBoxName);
-      final Box<Client> clientsBox = Hive.box<Client>(clientsBoxName);
       final Box<String> settingsBox = Hive.box<String>(settingsBoxName);
-
       final DateTime now = DateTime.now();
-      final String nowIso = now.toIso8601String();
-      final String day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-
-      final Map<String, dynamic> payload = <String, dynamic>{
-        'version': 2,
-        'exportedAt': nowIso,
-        'employees': employeesBox.values.map(_employeeToMap).toList(),
-        'events': eventsBox.values.map(_eventToMap).toList(),
-        'roleSlots': slotsBox.values.map(_roleSlotToMap).toList(),
-        'shiftLogs': logsBox.values.map(_shiftLogToMap).toList(),
-        'clients': clientsBox.values.map(_clientToMap).toList(),
-      };
-
-      final String jsonText = const JsonEncoder.withIndent('  ').convert(payload);
+      final String jsonText = _buildBackupJson(now);
       final Directory tempDir = await getTemporaryDirectory();
-      final String fileName = 'staffing_backup_$day.json';
+      final String fileName = 'staffing_backup_${DateFormat('yyyy-MM-dd').format(now)}.json';
       final File file = File('${tempDir.path}/$fileName');
-      await file.writeAsString(jsonText);
+      await file.writeAsString(jsonText, encoding: utf8);
 
-      await settingsBox.put(lastBackupDateKey, nowIso);
+      await settingsBox.put(lastBackupDateKey, now.toIso8601String());
 
-      await Printing.sharePdf(
-        bytes: utf8.encode(jsonText),
-        filename: fileName,
+      await Share.shareXFiles(
+        <XFile>[XFile(file.path, mimeType: 'application/json')],
+        subject: fileName,
       );
 
       if (mounted) {
@@ -317,6 +299,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  String _buildBackupJson(DateTime now) {
+    final Box<Employee> employeesBox = Hive.box<Employee>(employeesBoxName);
+    final Box<Event> eventsBox = Hive.box<Event>(eventsBoxName);
+    final Box<RoleSlot> slotsBox = Hive.box<RoleSlot>(roleSlotsBoxName);
+    final Box<ShiftLog> logsBox = Hive.box<ShiftLog>(shiftLogsBoxName);
+    final Box<Client> clientsBox = Hive.box<Client>(clientsBoxName);
+
+    final Map<String, dynamic> payload = <String, dynamic>{
+      'version': 2,
+      'exportedAt': now.toIso8601String(),
+      'employees': employeesBox.values.map(_employeeToMap).toList(),
+      'events': eventsBox.values.map(_eventToMap).toList(),
+      'roleSlots': slotsBox.values.map(_roleSlotToMap).toList(),
+      'shiftLogs': logsBox.values.map(_shiftLogToMap).toList(),
+      'clients': clientsBox.values.map(_clientToMap).toList(),
+    };
+
+    return const JsonEncoder.withIndent('  ').convert(payload);
+  }
+
   Future<void> _importBackup() async {
     final AppLocalizations l10n = AppLocalizations.of(context)!;
     setState(() {
@@ -328,6 +330,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         type: FileType.custom,
         allowedExtensions: <String>['json'],
       );
+      if (!mounted) {
+        return;
+      }
 
       if (result == null || result.files.isEmpty) {
         return;
@@ -343,57 +348,82 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         throw const FormatException('Invalid file');
       }
 
-      final dynamic decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) {
+      late final List<dynamic> employeesRaw;
+      late final List<dynamic> eventsRaw;
+      late final List<dynamic> slotsRaw;
+      late final List<dynamic> logsRaw;
+      late final List<dynamic> clientsRaw;
+      try {
+        final dynamic decoded = jsonDecode(raw);
+        if (decoded is! Map<String, dynamic>) {
+          throw const FormatException('Malformed JSON');
+        }
+
+        final dynamic version = decoded['version'];
+        final dynamic employees = decoded['employees'];
+        final dynamic events = decoded['events'];
+        final dynamic roleSlots = decoded['roleSlots'];
+        final dynamic shiftLogs = decoded['shiftLogs'];
+        final dynamic clients = decoded['clients'];
+
+        if (version is! int ||
+            employees is! List ||
+            events is! List ||
+            roleSlots is! List ||
+            shiftLogs is! List ||
+            clients is! List) {
+          throw const FormatException('Missing or invalid required fields');
+        }
+
+        employeesRaw = employees;
+        eventsRaw = events;
+        slotsRaw = roleSlots;
+        logsRaw = shiftLogs;
+        clientsRaw = clients;
+      } on FormatException {
+        rethrow;
+      } catch (_) {
         throw const FormatException('Malformed JSON');
       }
-
-      if (!decoded.containsKey('version')) {
-        throw const FormatException('Missing version field');
-      }
-      if (decoded['employees'] is! List ||
-          decoded['events'] is! List ||
-          decoded['roleSlots'] is! List ||
-          decoded['shiftLogs'] is! List ||
-          decoded['clients'] is! List) {
-        throw const FormatException('Missing required arrays');
-      }
-
-      final List<dynamic> employeesRaw = decoded['employees'] as List<dynamic>;
-      final List<dynamic> eventsRaw = decoded['events'] as List<dynamic>;
-      final List<dynamic> slotsRaw = decoded['roleSlots'] as List<dynamic>;
-      final List<dynamic> logsRaw = decoded['shiftLogs'] as List<dynamic>;
-      final List<dynamic> clientsRaw = decoded['clients'] as List<dynamic>;
 
       final bool proceed = await ConfirmDialog.ask(
         context,
         title: l10n.importWarningTitle,
-        message: l10n.importSummary(
-          employeesRaw.length,
-          eventsRaw.length,
-          logsRaw.length,
-        ),
+        message:
+            'Esta copia contiene ${employeesRaw.length} personas, ${eventsRaw.length} eventos y ${logsRaw.length} registros.\nEsto reemplazará todos los datos actuales. ¿Continuar?',
         confirmLabel: l10n.settingsImport,
       );
+      if (!mounted) {
+        return;
+      }
       if (!proceed) {
         return;
       }
 
-      final List<Employee> employees = employeesRaw
+        late final List<Employee> employees;
+        late final List<Event> events;
+        late final List<RoleSlot> slots;
+        late final List<ShiftLog> logs;
+        late final List<Client> clients;
+        try {
+        employees = employeesRaw
           .map((dynamic e) => _employeeFromMap(e as Map<String, dynamic>))
           .toList();
-      final List<Event> events = eventsRaw
+        events = eventsRaw
           .map((dynamic e) => _eventFromMap(e as Map<String, dynamic>))
           .toList();
-      final List<RoleSlot> slots = slotsRaw
+        slots = slotsRaw
           .map((dynamic e) => _roleSlotFromMap(e as Map<String, dynamic>))
           .toList();
-      final List<ShiftLog> logs = logsRaw
+        logs = logsRaw
           .map((dynamic e) => _shiftLogFromMap(e as Map<String, dynamic>))
           .toList();
-      final List<Client> clients = clientsRaw
+        clients = clientsRaw
           .map((dynamic e) => _clientFromMap(e as Map<String, dynamic>))
           .toList();
+        } catch (_) {
+        throw const FormatException('Malformed backup payload');
+        }
 
       final Box<Employee> employeesBox = Hive.box<Employee>(employeesBoxName);
       final Box<Event> eventsBox = Hive.box<Event>(eventsBoxName);
@@ -401,41 +431,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final Box<ShiftLog> logsBox = Hive.box<ShiftLog>(shiftLogsBoxName);
       final Box<Client> clientsBox = Hive.box<Client>(clientsBoxName);
 
-      await employeesBox.clear();
-      await eventsBox.clear();
-      await slotsBox.clear();
-      await logsBox.clear();
-      await clientsBox.clear();
+      try {
+        await employeesBox.clear();
+        await eventsBox.clear();
+        await slotsBox.clear();
+        await logsBox.clear();
+        await clientsBox.clear();
 
-      for (final Employee employee in employees) {
-        await employeesBox.put(employee.id, employee);
-      }
-      for (final Event event in events) {
-        await eventsBox.put(event.id, event);
-      }
-      for (final RoleSlot slot in slots) {
-        await slotsBox.put(slot.id, slot);
-      }
-      for (final ShiftLog log in logs) {
-        await logsBox.put(log.id, log);
-      }
-      for (final Client client in clients) {
-        await clientsBox.put(client.id, client);
-      }
+        for (final Employee employee in employees) {
+          await employeesBox.put(employee.id, employee);
+        }
+        for (final Event event in events) {
+          await eventsBox.put(event.id, event);
+        }
+        for (final RoleSlot slot in slots) {
+          await slotsBox.put(slot.id, slot);
+        }
+        for (final ShiftLog log in logs) {
+          await logsBox.put(log.id, log);
+        }
+        for (final Client client in clients) {
+          await clientsBox.put(client.id, client);
+        }
 
-      ref.invalidate(employeesProvider);
-      ref.invalidate(eventsProvider);
-      await NotificationScheduler.refreshAllEventReminders();
+        ref.invalidate(employeesProvider);
+        ref.invalidate(eventsProvider);
+        await NotificationScheduler.refreshAllEventReminders();
 
-      if (mounted) {
+        if (!mounted) {
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Copia importada correctamente.')),
+          const SnackBar(content: Text('Datos importados correctamente')),
+        );
+      } catch (_) {
+        if (!mounted) {
+          return;
+        }
+        await showDialog<void>(
+          context: context,
+          builder: (BuildContext dialogContext) {
+            return AlertDialog(
+              title: const Text('Error al importar'),
+              content: const Text(
+                'Ocurrió un error durante la importación. Algunos datos pueden haberse perdido. Por favor importa de nuevo desde una copia de seguridad.',
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Entendido'),
+                ),
+              ],
+            );
+          },
         );
       }
     } on FormatException {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('El archivo no tiene un formato válido.')),
+          const SnackBar(content: Text('Archivo no válido — no se importaron datos')),
         );
       }
     } catch (_) {
@@ -602,6 +656,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       'outcome': value.outcome.name,
       'minutesLate': value.minutesLate,
       'notes': value.notes,
+      'scoreBeforeLog': value.scoreBeforeLog,
       'scoreDelta': value.scoreDelta,
       'loggedAt': value.loggedAt,
     };
@@ -687,6 +742,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       outcome: _shiftOutcomeFromName(map['outcome'] as String?),
       minutesLate: map['minutesLate'] as int?,
       notes: map['notes'] as String?,
+      scoreBeforeLog: (map['scoreBeforeLog'] as num?)?.toDouble() ?? 0.0,
       scoreDelta: (map['scoreDelta'] as num?)?.toDouble() ?? 0.0,
       loggedAt: map['loggedAt'] as String? ?? DateTime.now().toIso8601String(),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 
 import '../core/utils/notification_scheduler.dart';
 import '../models/enums.dart';
@@ -72,14 +73,22 @@ class EventNotifier extends StateNotifier<List<Event>> {
 
   Future<void> add(Event event) async {
     await _repository.save(event);
-    await NotificationScheduler.scheduleEventReminder(event);
     _load();
+    try {
+      await NotificationScheduler.scheduleEventReminder(event);
+    } catch (error, stackTrace) {
+      debugPrint('Failed to schedule reminder for ${event.id}: $error\n$stackTrace');
+    }
   }
 
   Future<void> update(Event event) async {
     await _repository.save(event);
-    await NotificationScheduler.scheduleEventReminder(event);
     _load();
+    try {
+      await NotificationScheduler.scheduleEventReminder(event);
+    } catch (error, stackTrace) {
+      debugPrint('Failed to schedule reminder for ${event.id}: $error\n$stackTrace');
+    }
   }
 
   Future<void> updateStatus(String eventId, EventStatus status) async {
@@ -89,17 +98,25 @@ class EventNotifier extends StateNotifier<List<Event>> {
     }
     event.status = status;
     await _repository.save(event);
-    if (status == EventStatus.cancelled) {
-      await NotificationScheduler.cancelEventReminder(eventId);
-    } else {
-      await NotificationScheduler.scheduleEventReminder(event);
-    }
     _load();
+    try {
+      if (status == EventStatus.cancelled) {
+        await NotificationScheduler.cancelEventReminder(eventId);
+      } else {
+        await NotificationScheduler.scheduleEventReminder(event);
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Failed to update reminder for $eventId: $error\n$stackTrace');
+    }
   }
 
   Future<void> delete(String eventId) async {
     await _repository.delete(eventId);
-    await NotificationScheduler.cancelEventReminder(eventId);
     _load();
+    try {
+      await NotificationScheduler.cancelEventReminder(eventId);
+    } catch (error, stackTrace) {
+      debugPrint('Failed to cancel reminder for $eventId: $error\n$stackTrace');
+    }
   }
 }

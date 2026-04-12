@@ -13,6 +13,7 @@ class ShiftLog {
     required this.outcome,
     this.minutesLate,
     this.notes,
+    this.scoreBeforeLog = 0.0,
     required this.scoreDelta,
     required this.loggedAt,
   });
@@ -41,6 +42,9 @@ class ShiftLog {
   // ISO-8601 DateTime string.
   @HiveField(7)
   String loggedAt;
+
+  @HiveField(8, defaultValue: 0.0)
+  double scoreBeforeLog;
 }
 
 // Run: flutter pub run build_runner build

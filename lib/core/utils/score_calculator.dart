@@ -9,7 +9,8 @@ double computeScoreDelta(
     case ShiftOutcome.showed_up:
       return 0.1;
     case ShiftOutcome.late:
-      if ((minutesLate ?? 0) < 15) {
+      final int minutes = minutesLate ?? 15;
+      if (minutes < 15) {
         return -0.1;
       }
       return -0.3;

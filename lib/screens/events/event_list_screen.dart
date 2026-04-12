@@ -113,7 +113,7 @@ class EventListScreen extends ConsumerWidget {
                 children: <Widget>[
                   Container(
                     width: 4,
-                    height: double.infinity,
+                    margin: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
                       color: _statusColor(event.status),
                       borderRadius: const BorderRadius.only(

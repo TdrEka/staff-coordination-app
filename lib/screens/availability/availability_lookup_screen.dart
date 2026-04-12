@@ -16,6 +16,8 @@ class AvailabilityLookupScreen extends ConsumerStatefulWidget {
   const AvailabilityLookupScreen({super.key})
       : targetEvent = null,
         allSlots = const <RoleSlot>[],
+        allEvents = const <Event>[],
+        excludeSlotId = null,
         initialRole = null,
         asBottomSheet = false,
         onAssignSelected = null;
@@ -24,6 +26,8 @@ class AvailabilityLookupScreen extends ConsumerStatefulWidget {
     super.key,
     required this.targetEvent,
     required this.allSlots,
+    required this.allEvents,
+    this.excludeSlotId,
     this.initialRole,
     this.asBottomSheet = true,
     this.onAssignSelected,
@@ -31,6 +35,8 @@ class AvailabilityLookupScreen extends ConsumerStatefulWidget {
 
   final Event? targetEvent;
   final List<RoleSlot> allSlots;
+  final List<Event> allEvents;
+  final String? excludeSlotId;
   final String? initialRole;
   final bool asBottomSheet;
   final Future<void> Function(Employee employee)? onAssignSelected;
@@ -248,8 +254,8 @@ class _AvailabilityLookupScreenState extends ConsumerState<AvailabilityLookupScr
     required String value,
     required VoidCallback onTap,
   }) {
-    return SizedBox(
-      height: 56,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 56),
       child: InkWell(
         onTap: onTap,
         child: Padding(
@@ -258,9 +264,18 @@ class _AvailabilityLookupScreenState extends ConsumerState<AvailabilityLookupScr
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 2),
-              Text(value),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -308,7 +323,9 @@ class _AvailabilityLookupScreenState extends ConsumerState<AvailabilityLookupScr
     ref.read(availabilityLookupProvider.notifier).search(
           employees: employees,
           allSlots: widget.allSlots,
+          allEvents: widget.allEvents,
           targetEvent: widget.targetEvent,
+          excludeSlotId: widget.excludeSlotId,
         );
   }
 

@@ -18,6 +18,16 @@ const String remindersEnabledKey = 'remindersEnabled';
 
 bool _hiveInitialized = false;
 
+Future<Box<T>> _openBoxSafe<T>(String name) async {
+  try {
+    return await Hive.openBox<T>(name);
+  } catch (_) {
+    // Box file is corrupted. Recreate it so launch can continue.
+    await Hive.deleteBoxFromDisk(name);
+    return await Hive.openBox<T>(name);
+  }
+}
+
 Future<void> initHive() async {
   if (!_hiveInitialized) {
     await Hive.initFlutter();
@@ -46,21 +56,21 @@ Future<void> initHive() async {
   }
 
   if (!Hive.isBoxOpen(employeesBoxName)) {
-    await Hive.openBox<Employee>(employeesBoxName);
+    await _openBoxSafe<Employee>(employeesBoxName);
   }
   if (!Hive.isBoxOpen(eventsBoxName)) {
-    await Hive.openBox<Event>(eventsBoxName);
+    await _openBoxSafe<Event>(eventsBoxName);
   }
   if (!Hive.isBoxOpen(roleSlotsBoxName)) {
-    await Hive.openBox<RoleSlot>(roleSlotsBoxName);
+    await _openBoxSafe<RoleSlot>(roleSlotsBoxName);
   }
   if (!Hive.isBoxOpen(shiftLogsBoxName)) {
-    await Hive.openBox<ShiftLog>(shiftLogsBoxName);
+    await _openBoxSafe<ShiftLog>(shiftLogsBoxName);
   }
   if (!Hive.isBoxOpen(clientsBoxName)) {
-    await Hive.openBox<Client>(clientsBoxName);
+    await _openBoxSafe<Client>(clientsBoxName);
   }
   if (!Hive.isBoxOpen(settingsBoxName)) {
-    await Hive.openBox<String>(settingsBoxName);
+    await _openBoxSafe<String>(settingsBoxName);
   }
 }

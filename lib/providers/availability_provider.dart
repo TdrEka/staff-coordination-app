@@ -113,7 +113,9 @@ class AvailabilityLookupNotifier extends StateNotifier<AvailabilityLookupState> 
   void search({
     required List<Employee> employees,
     required List<RoleSlot> allSlots,
+    required List<Event> allEvents,
     Event? targetEvent,
+    String? excludeSlotId,
   }) {
     final Event lookupEvent = targetEvent ??
         Event(
@@ -144,7 +146,13 @@ class AvailabilityLookupNotifier extends StateNotifier<AvailabilityLookupState> 
           ),
         )
         .map((Employee e) {
-          final Event? conflictingEvent = getConflictingEvent(e, lookupEvent, allSlots);
+          final Event? conflictingEvent = getConflictingEvent(
+            e,
+            lookupEvent,
+            allSlots,
+            allEvents,
+            excludeSlotId: excludeSlotId,
+          );
           return EmployeeAvailabilityResult(
             employee: e,
             hasConflict: conflictingEvent != null,

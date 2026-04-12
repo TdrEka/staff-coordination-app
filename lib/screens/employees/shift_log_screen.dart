@@ -16,6 +16,7 @@ import '../../providers/event_provider.dart';
 import '../../repositories/event_repository.dart';
 import '../../repositories/role_slot_repository.dart';
 import '../../repositories/shift_log_repository.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/empty_state_panel.dart';
 import '../../widgets/reliability_badge.dart';
 import '../../widgets/status_chip.dart';
@@ -133,6 +134,7 @@ class _ShiftLogScreenState extends ConsumerState<ShiftLogScreen> {
             draft.minutesLate,
             advanceNotice: draft.advanceNotice,
           );
+          final double scoreBeforeLog = employee.reliabilityScore;
 
           String? notes = draft.notes?.trim().isEmpty ?? true ? null : draft.notes!.trim();
           if (draft.outcome == ShiftOutcome.cancelled_advance && draft.advanceNotice) {
@@ -146,9 +148,26 @@ class _ShiftLogScreenState extends ConsumerState<ShiftLogScreen> {
             outcome: draft.outcome,
             minutesLate: draft.outcome == ShiftOutcome.late ? draft.minutesLate : null,
             notes: notes,
+            scoreBeforeLog: scoreBeforeLog,
             scoreDelta: delta,
             loggedAt: DateTime.now().toIso8601String(),
           );
+
+          final ShiftLog? existingLog =
+              _shiftLogRepository.getMostRecentByEmployeeAndEvent(employee.id, event.id);
+          if (existingLog != null) {
+            final bool addAnother = await ConfirmDialog.ask(
+              context,
+              title: 'Registro existente',
+              message:
+                  'Ya hay un registro para ${employee.name} en este evento.\n¿Quieres anadir otro igualmente?',
+              confirmLabel: 'Anadir',
+              cancelLabel: 'Omitir',
+            );
+            if (!addAnother) {
+              continue;
+            }
+          }
 
           await _shiftLogRepository.save(log);
 
@@ -319,6 +338,7 @@ class _ShiftLogScreenState extends ConsumerState<ShiftLogScreen> {
       eventId: 'manual-override',
       outcome: ShiftOutcome.manual_override,
       notes: 'Ajuste manual: $reason',
+      scoreBeforeLog: employee.reliabilityScore,
       scoreDelta: delta,
       loggedAt: DateTime.now().toIso8601String(),
     );
@@ -379,6 +399,26 @@ class _PostEventBodyState extends State<_PostEventBody> {
   late final Map<String, _PostLogDraft> _drafts = <String, _PostLogDraft>{
     for (final String id in widget.assignedEmployeeIds) id: _PostLogDraft(),
   };
+
+  bool _validateDrafts() {
+    bool valid = true;
+    for (final String employeeId in widget.assignedEmployeeIds) {
+      final _PostLogDraft draft = _drafts[employeeId] ?? _PostLogDraft();
+      if (draft.outcome == ShiftOutcome.late) {
+        final int? minutes = draft.minutesLate;
+        if (minutes == null || minutes <= 0) {
+          valid = false;
+          draft.lateMinutesError = 'Indica los minutos de retraso';
+        } else {
+          draft.lateMinutesError = null;
+        }
+      } else {
+        draft.lateMinutesError = null;
+      }
+      _drafts[employeeId] = draft;
+    }
+    return valid;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -453,6 +493,9 @@ class _PostEventBodyState extends State<_PostEventBody> {
                                   }
                                   setState(() {
                                     draft.outcome = value;
+                                    if (value != ShiftOutcome.late) {
+                                      draft.lateMinutesError = null;
+                                    }
                                   });
                                 },
                               ),
@@ -463,9 +506,25 @@ class _PostEventBodyState extends State<_PostEventBody> {
                                   decoration: InputDecoration(labelText: l10n.shiftLogMinutesLate),
                                   keyboardType: TextInputType.number,
                                   onChanged: (String value) {
-                                    draft.minutesLate = int.tryParse(value);
+                                    setState(() {
+                                      draft.minutesLate = int.tryParse(value);
+                                      if (draft.minutesLate != null && draft.minutesLate! > 0) {
+                                        draft.lateMinutesError = null;
+                                      }
+                                    });
                                   },
                                 ),
+                                if (draft.lateMinutesError != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      draft.lateMinutesError!,
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.error,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
                               ],
                               if (draft.outcome == ShiftOutcome.cancelled_advance) ...<Widget>[
                                 const SizedBox(height: 8),
@@ -503,7 +562,14 @@ class _PostEventBodyState extends State<_PostEventBody> {
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () => widget.onLogAll(_drafts),
+                  onPressed: () {
+                    setState(() {
+                      // Rebuild to paint validation messages.
+                    });
+                    if (_validateDrafts()) {
+                      widget.onLogAll(_drafts);
+                    }
+                  },
                   icon: const Icon(Icons.save),
                   label: Text(l10n.shiftLogAll),
                 ),
@@ -521,6 +587,7 @@ class _PostLogDraft {
   int? minutesLate;
   bool advanceNotice = false;
   String? notes;
+  String? lateMinutesError;
 }
 
 String _formatDate(String raw) {
