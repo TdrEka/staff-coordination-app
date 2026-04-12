@@ -88,11 +88,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           weekendTextStyle:
               Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.secondary) ??
               const TextStyle(color: AppTheme.secondary),
-          selectedDecoration: BoxDecoration(
+          selectedDecoration: const BoxDecoration(
             color: AppTheme.primary,
             shape: BoxShape.circle,
           ),
-          todayDecoration: BoxDecoration(
+          todayDecoration: const BoxDecoration(
             color: AppTheme.primaryContainer,
             shape: BoxShape.circle,
           ),
