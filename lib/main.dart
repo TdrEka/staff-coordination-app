@@ -7,12 +7,16 @@ import 'package:hive/hive.dart';
 import 'app.dart';
 import 'core/hive_boxes.dart';
 import 'core/utils/notification_scheduler.dart';
+import 'core/utils/score_calculator.dart';
+import 'models/employee.dart';
+import 'models/shift_log.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
     await initHive();
+    await _reconcileReliabilityScoresFromShiftLogs();
 
     runApp(
       const ProviderScope(
@@ -79,6 +83,35 @@ Future<void> main() async {
         ),
       ),
     );
+  }
+}
+
+Future<void> _reconcileReliabilityScoresFromShiftLogs() async {
+  final Box<Employee> employeesBox = Hive.box<Employee>(employeesBoxName);
+  final Box<ShiftLog> shiftLogsBox = Hive.box<ShiftLog>(shiftLogsBoxName);
+
+  final Map<String, List<ShiftLog>> byEmployee = <String, List<ShiftLog>>{};
+  for (final ShiftLog log in shiftLogsBox.values) {
+    byEmployee.putIfAbsent(log.employeeId, () => <ShiftLog>[]).add(log);
+  }
+
+  for (final Employee employee in employeesBox.values) {
+    final List<ShiftLog> logs = byEmployee[employee.id] ?? <ShiftLog>[];
+    logs.sort((ShiftLog a, ShiftLog b) {
+      final DateTime aTime = DateTime.tryParse(a.loggedAt) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final DateTime bTime = DateTime.tryParse(b.loggedAt) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return aTime.compareTo(bTime);
+    });
+
+    double nextScore = 5.0;
+    for (final ShiftLog log in logs) {
+      nextScore = applyDelta(nextScore, log.scoreDelta);
+    }
+
+    if (employee.reliabilityScore != nextScore) {
+      employee.reliabilityScore = nextScore;
+      await employeesBox.put(employee.id, employee);
+    }
   }
 }
 

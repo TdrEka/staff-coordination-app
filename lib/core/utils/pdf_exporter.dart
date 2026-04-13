@@ -39,6 +39,7 @@ Future<Uint8List> generateRosterPdf(
         return <pw.Widget>[
           pw.Text(
             event.title,
+            maxLines: 2,
             style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 6),
@@ -93,7 +94,7 @@ Future<Uint8List> generateRosterPdf(
                       color: unassigned ? PdfColors.red : PdfColors.black,
                     ),
                     _cell(unassigned ? '-' : employee.phone),
-                    _cell(slot.status.name),
+                    _cell(_statusLabel(slot.status)),
                   ],
                 );
               }),
@@ -101,7 +102,10 @@ Future<Uint8List> generateRosterPdf(
           ),
           pw.SizedBox(height: 14),
           _sectionTitle('Notas:'),
-          pw.Text((event.exportNotes).trim().isEmpty ? '-' : event.exportNotes),
+          pw.Text(
+            (event.exportNotes).trim().isEmpty ? '-' : event.exportNotes,
+            maxLines: 10,
+          ),
         ];
       },
     ),
@@ -121,7 +125,10 @@ pw.Widget _line(String label, String? value) {
   final String text = (value ?? '').trim().isEmpty ? '-' : value!.trim();
   return pw.Padding(
     padding: const pw.EdgeInsets.only(top: 2),
-    child: pw.Text('$label: $text'),
+    child: pw.Text(
+      '$label: $text',
+      maxLines: 3,
+    ),
   );
 }
 
@@ -134,12 +141,24 @@ pw.Widget _cell(
     padding: const pw.EdgeInsets.all(6),
     child: pw.Text(
       value,
+      maxLines: 3,
       style: pw.TextStyle(
         fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
         color: color,
       ),
     ),
   );
+}
+
+String _statusLabel(SlotStatus status) {
+  switch (status) {
+    case SlotStatus.pending:
+      return 'Pendiente';
+    case SlotStatus.uncovered:
+      return 'Vacante';
+    case SlotStatus.confirmed:
+      return 'Confirmado';
+  }
 }
 
 String _formatDate(String raw) {

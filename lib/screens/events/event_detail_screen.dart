@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/utils/pdf_exporter.dart';
 import '../../core/utils/notification_scheduler.dart';
 import '../../core/ui/app_colors.dart';
+import '../../core/theme.dart';
 import '../../core/utils/localization_utils.dart';
 import '../../models/employee.dart';
 import '../../models/enums.dart';
@@ -172,13 +173,59 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             ),
           ..._slots.map((RoleSlot slot) {
             final String assignedName = _assignedEmployeeName(slot.assignedEmployeeId, employees);
-            return RoleSlotTile(
-              slot: slot,
-              assignedEmployeeName: assignedName,
-              onAssign: () => _showAssignBottomSheet(event, slot),
-              onConfirm: () => _confirmPendingSlot(slot, assignedName),
-              onTap: () => _showRoleSlotEditor(event.id, existing: slot),
-              onLongPress: () => _tryClearAssignment(slot),
+            return Dismissible(
+              key: Key(slot.id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                decoration: BoxDecoration(
+                  color: AppTheme.statusRed.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.delete_outline,
+                  color: AppTheme.statusRed,
+                ),
+              ),
+              confirmDismiss: (DismissDirection direction) async {
+                return await ConfirmDialog.ask(
+                  context,
+                  title: 'Eliminar puesto',
+                  message: slot.assignedEmployeeId != null
+                      ? 'Este puesto tiene una persona asignada. ¿Eliminar igualmente?'
+                      : '¿Eliminar este puesto?',
+                  confirmLabel: 'Eliminar',
+                  cancelLabel: 'Cancelar',
+                );
+              },
+              onDismissed: (DismissDirection direction) async {
+                await _roleSlotRepository.delete(slot.id);
+                final Event? updatedEvent =
+                    ref.read(eventsProvider.notifier).getById(slot.eventId);
+                if (updatedEvent != null) {
+                  await NotificationScheduler.scheduleEventReminder(updatedEvent);
+                }
+                if (!mounted) {
+                  return;
+                }
+                setState(() => _loadSlots());
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Puesto eliminado'),
+                    duration: Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              child: RoleSlotTile(
+                slot: slot,
+                assignedEmployeeName: assignedName,
+                onAssign: () => _showAssignBottomSheet(event, slot),
+                onConfirm: () => _confirmPendingSlot(slot, assignedName),
+                onTap: () => _showRoleSlotEditor(event.id, existing: slot),
+                onLongPress: () => _tryClearAssignment(slot),
+              ),
             );
           }),
           const SizedBox(height: 12),
@@ -466,29 +513,34 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                         Expanded(
                           child: FilledButton(
                             onPressed: () async {
-                              if (roleController.text.trim().isEmpty) {
+                              final String roleType = roleController.text.trim();
+                              if (roleType.isEmpty) {
                                 return;
                               }
-                              if (isEditing) {
-                                final RoleSlot slot = RoleSlot(
-                                  id: existing!.id,
-                                  eventId: eventId,
-                                  roleType: roleController.text.trim(),
-                                  assignedEmployeeId: existing.assignedEmployeeId,
-                                  status: existing.status,
-                                  priority: selectedPriority,
-                                  callTime: selectedCallTime == null ? null : _formatTime(selectedCallTime!),
-                                  notes: notesController.text.trim().isEmpty
-                                      ? null
-                                      : notesController.text.trim(),
-                                );
-                                await _roleSlotRepository.save(slot);
-                              } else {
+
+                              Future<void> saveSlots() async {
+                                if (isEditing) {
+                                  final RoleSlot slot = RoleSlot(
+                                    id: existing.id,
+                                    eventId: eventId,
+                                    roleType: roleType,
+                                    assignedEmployeeId: existing.assignedEmployeeId,
+                                    status: existing.status,
+                                    priority: selectedPriority,
+                                    callTime: selectedCallTime == null ? null : _formatTime(selectedCallTime!),
+                                    notes: notesController.text.trim().isEmpty
+                                        ? null
+                                        : notesController.text.trim(),
+                                  );
+                                  await _roleSlotRepository.save(slot);
+                                  return;
+                                }
+
                                 for (int i = 0; i < quantity; i += 1) {
                                   final RoleSlot slot = RoleSlot(
                                     id: _uuid.v4(),
                                     eventId: eventId,
-                                    roleType: roleController.text.trim(),
+                                    roleType: roleType,
                                     assignedEmployeeId: null,
                                     status: SlotStatus.uncovered,
                                     priority: selectedPriority,
@@ -500,17 +552,34 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                                   await _roleSlotRepository.save(slot);
                                 }
                               }
+
+                              await saveSlots();
                               final Event? currentEvent =
                                   ref.read(eventsProvider.notifier).getById(eventId);
                               if (currentEvent != null) {
                                 await NotificationScheduler.scheduleEventReminder(currentEvent);
                               }
-                              if (mounted) {
-                                setState(_loadSlots);
+                              if (!mounted) {
+                                return;
                               }
-                              if (context.mounted) {
-                                context.pop();
+                              setState(() => _loadSlots());
+                              if (!isEditing) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      quantity == 1
+                                          ? 'Puesto añadido'
+                                          : '$quantity puestos añadidos',
+                                    ),
+                                    duration: const Duration(seconds: 2),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
                               }
+                              if (!context.mounted) {
+                                return;
+                              }
+                              context.pop();
                             },
                             child: Text(isEditing ? l10n.save : l10n.eventsAdd),
                           ),

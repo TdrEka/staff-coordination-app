@@ -1,4 +1,8 @@
+import 'dart:developer' as developer;
+import 'dart:io';
+
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/client.dart';
 import '../models/employee.dart';
@@ -21,10 +25,85 @@ bool _hiveInitialized = false;
 Future<Box<T>> _openBoxSafe<T>(String name) async {
   try {
     return await Hive.openBox<T>(name);
-  } catch (_) {
-    // Box file is corrupted. Recreate it so launch can continue.
+  } catch (error, stackTrace) {
+    final bool corruption = _isCorruptionError(error);
+
+    developer.log(
+      'Failed to open Hive box "$name" (corruption=$corruption): $error',
+      name: 'hive_boxes',
+      error: error,
+      stackTrace: stackTrace,
+    );
+
+    if (!corruption) {
+      // Non-corruption failures (e.g. temporary I/O or storage full) must not
+      // delete user data. Bubble up so startup can show a controlled error.
+      rethrow;
+    }
+
+    await _backupBoxFiles(name);
+
+    // Corruption confirmed: recreate the affected box so app can continue.
     await Hive.deleteBoxFromDisk(name);
     return await Hive.openBox<T>(name);
+  }
+}
+
+bool _isCorruptionError(Object error) {
+  final String message = error.toString().toLowerCase();
+  const List<String> corruptionSignals = <String>[
+    'corrupt',
+    'corrupted',
+    'checksum',
+    'invalid frame',
+    'failed to read',
+    'cannot read',
+    'unexpected eof',
+    'bad state: read',
+    'format exception',
+  ];
+
+  for (final String signal in corruptionSignals) {
+    if (message.contains(signal)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Future<void> _backupBoxFiles(String name) async {
+  try {
+    final int stamp = DateTime.now().millisecondsSinceEpoch;
+    final Directory dir = await getApplicationDocumentsDirectory();
+    if (!await dir.exists()) {
+      return;
+    }
+
+    final List<String> candidates = <String>[
+      '$name.hive',
+      '$name.lock',
+    ];
+
+    for (final String fileName in candidates) {
+      final File source = File(
+        '${dir.path}${Platform.pathSeparator}$fileName',
+      );
+      if (!await source.exists()) {
+        continue;
+      }
+      final File target = File(
+        '${source.path}.bak.$stamp',
+      );
+      await source.copy(target.path);
+    }
+  } catch (error, stackTrace) {
+    // Backup is best-effort; never block recovery if backup copy fails.
+    developer.log(
+      'Failed to back up Hive box files for "$name": $error',
+      name: 'hive_boxes',
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 }
 

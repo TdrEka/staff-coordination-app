@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:staff_coordination_app/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -120,9 +121,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             context,
             title: 'Copia de seguridad y restauración',
             children: <Widget>[
-              Padding(
+              const Padding(
                 padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: const Text('Exporta o importa todos los datos de la aplicación.'),
+                child: Text('Exporta o importa todos los datos de la aplicación.'),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
@@ -279,7 +280,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final Box<String> settingsBox = Hive.box<String>(settingsBoxName);
       final DateTime now = DateTime.now();
-      final String jsonText = _buildBackupJson(now);
+      final String jsonText = await _buildBackupJson(now);
       final Directory tempDir = await getTemporaryDirectory();
       final String fileName = 'staffing_backup_${DateFormat('yyyy-MM-dd').format(now)}.json';
       final File file = File('${tempDir.path}/$fileName');
@@ -312,7 +313,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  String _buildBackupJson(DateTime now) {
+  Future<String> _buildBackupJson(DateTime now) async {
     final Box<Employee> employeesBox = Hive.box<Employee>(employeesBoxName);
     final Box<Event> eventsBox = Hive.box<Event>(eventsBoxName);
     final Box<RoleSlot> slotsBox = Hive.box<RoleSlot>(roleSlotsBoxName);
@@ -329,7 +330,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       'clients': clientsBox.values.map(_clientToMap).toList(),
     };
 
-    return const JsonEncoder.withIndent('  ').convert(payload);
+    return compute(_encodeBackupPayload, payload);
   }
 
   Future<void> _importBackup() async {
@@ -370,9 +371,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       late final List<dynamic> logsRaw;
       late final List<dynamic> clientsRaw;
       try {
-        final dynamic decoded = jsonDecode(raw);
-        if (decoded is! Map<String, dynamic>) {
-          throw const FormatException('Malformed JSON');
+        final Map<String, dynamic> decoded = await compute(_decodeBackupJson, raw);
+        if (!mounted) {
+          return;
         }
 
         final dynamic version = decoded['version'];
@@ -441,11 +442,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         throw const FormatException('Malformed backup payload');
         }
 
+      final String? integrityError = _validateImportIntegrity(
+        employees: employees,
+        events: events,
+        slots: slots,
+        logs: logs,
+        clients: clients,
+      );
+      if (integrityError != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Copia inválida: $integrityError')),
+          );
+        }
+        return;
+      }
+
       final Box<Employee> employeesBox = Hive.box<Employee>(employeesBoxName);
       final Box<Event> eventsBox = Hive.box<Event>(eventsBoxName);
       final Box<RoleSlot> slotsBox = Hive.box<RoleSlot>(roleSlotsBoxName);
       final Box<ShiftLog> logsBox = Hive.box<ShiftLog>(shiftLogsBoxName);
       final Box<Client> clientsBox = Hive.box<Client>(clientsBoxName);
+
+        // In-memory rollback snapshot (pre-import state).
+        final List<Map<String, dynamic>> employeesBackup =
+          employeesBox.values.map(_employeeToMap).toList(growable: false);
+        final List<Map<String, dynamic>> eventsBackup =
+          eventsBox.values.map(_eventToMap).toList(growable: false);
+        final List<Map<String, dynamic>> slotsBackup =
+          slotsBox.values.map(_roleSlotToMap).toList(growable: false);
+        final List<Map<String, dynamic>> logsBackup =
+          logsBox.values.map(_shiftLogToMap).toList(growable: false);
+        final List<Map<String, dynamic>> clientsBackup =
+          clientsBox.values.map(_clientToMap).toList(growable: false);
 
       try {
         await employeesBox.clear();
@@ -481,6 +510,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SnackBar(content: Text('Datos importados correctamente')),
         );
       } catch (_) {
+        try {
+          // Roll back to snapshot if any import write fails.
+          await employeesBox.clear();
+          await eventsBox.clear();
+          await slotsBox.clear();
+          await logsBox.clear();
+          await clientsBox.clear();
+
+          for (final Map<String, dynamic> map in employeesBackup) {
+            final Employee employee = _employeeFromMap(map);
+            await employeesBox.put(employee.id, employee);
+          }
+          for (final Map<String, dynamic> map in eventsBackup) {
+            final Event event = _eventFromMap(map);
+            await eventsBox.put(event.id, event);
+          }
+          for (final Map<String, dynamic> map in slotsBackup) {
+            final RoleSlot slot = _roleSlotFromMap(map);
+            await slotsBox.put(slot.id, slot);
+          }
+          for (final Map<String, dynamic> map in logsBackup) {
+            final ShiftLog log = _shiftLogFromMap(map);
+            await logsBox.put(log.id, log);
+          }
+          for (final Map<String, dynamic> map in clientsBackup) {
+            final Client client = _clientFromMap(map);
+            await clientsBox.put(client.id, client);
+          }
+
+          ref.invalidate(employeesProvider);
+          ref.invalidate(eventsProvider);
+          await NotificationScheduler.refreshAllEventReminders();
+        } catch (_) {
+          // If rollback also fails, we still show the same user-facing error.
+        }
+
         if (!mounted) {
           return;
         }
@@ -775,6 +840,89 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  String? _validateImportIntegrity({
+    required List<Employee> employees,
+    required List<Event> events,
+    required List<RoleSlot> slots,
+    required List<ShiftLog> logs,
+    required List<Client> clients,
+  }) {
+    final String? employeeDup = _findDuplicateId(
+      employees.map((Employee e) => e.id),
+    );
+    if (employeeDup != null) {
+      return 'ID duplicado en personas: $employeeDup';
+    }
+
+    final String? eventDup = _findDuplicateId(
+      events.map((Event e) => e.id),
+    );
+    if (eventDup != null) {
+      return 'ID duplicado en eventos: $eventDup';
+    }
+
+    final String? slotDup = _findDuplicateId(
+      slots.map((RoleSlot s) => s.id),
+    );
+    if (slotDup != null) {
+      return 'ID duplicado en puestos: $slotDup';
+    }
+
+    final String? logDup = _findDuplicateId(
+      logs.map((ShiftLog l) => l.id),
+    );
+    if (logDup != null) {
+      return 'ID duplicado en registros: $logDup';
+    }
+
+    final String? clientDup = _findDuplicateId(
+      clients.map((Client c) => c.id),
+    );
+    if (clientDup != null) {
+      return 'ID duplicado en clientes: $clientDup';
+    }
+
+    final Set<String> employeeIds =
+        employees.map((Employee e) => e.id.trim()).toSet();
+    final Set<String> eventIds =
+        events.map((Event e) => e.id.trim()).toSet();
+
+    for (final RoleSlot slot in slots) {
+      if (!eventIds.contains(slot.eventId.trim())) {
+        return 'Puesto con evento inexistente: ${slot.id}';
+      }
+      final String assigned = (slot.assignedEmployeeId ?? '').trim();
+      if (assigned.isNotEmpty && !employeeIds.contains(assigned)) {
+        return 'Puesto con persona inexistente: ${slot.id}';
+      }
+    }
+
+    for (final ShiftLog log in logs) {
+      if (!employeeIds.contains(log.employeeId.trim())) {
+        return 'Registro con persona inexistente: ${log.id}';
+      }
+      if (!eventIds.contains(log.eventId.trim())) {
+        return 'Registro con evento inexistente: ${log.id}';
+      }
+    }
+
+    return null;
+  }
+
+  String? _findDuplicateId(Iterable<String> rawIds) {
+    final Set<String> seen = <String>{};
+    for (final String raw in rawIds) {
+      final String id = raw.trim();
+      if (id.isEmpty) {
+        continue;
+      }
+      if (!seen.add(id)) {
+        return id;
+      }
+    }
+    return null;
+  }
+
   PreferredContact _preferredContactFromName(String? value) {
     return PreferredContact.values.firstWhere(
       (PreferredContact e) => e.name == value,
@@ -823,4 +971,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       orElse: () => ShiftOutcome.showed_up,
     );
   }
+}
+
+String _encodeBackupPayload(Map<String, dynamic> payload) {
+  return const JsonEncoder.withIndent('  ').convert(payload);
+}
+
+Map<String, dynamic> _decodeBackupJson(String raw) {
+  final dynamic decoded = jsonDecode(raw);
+  if (decoded is! Map<String, dynamic>) {
+    throw const FormatException('Malformed JSON');
+  }
+  return decoded;
 }

@@ -20,6 +20,7 @@ class NotificationScheduler {
       FlutterLocalNotificationsPlugin();
   static final RoleSlotRepository _roleSlotRepository = RoleSlotRepository();
   static final EventRepository _eventRepository = EventRepository();
+  static bool _timezoneInitialized = false;
 
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
     'event_reminders',
@@ -33,7 +34,7 @@ class NotificationScheduler {
       return;
     }
 
-    tz.initializeTimeZones();
+    await _ensureTimezoneInitialized();
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -59,6 +60,43 @@ class NotificationScheduler {
 
     // Request notification permission on Android 13+.
     await androidPlugin?.requestNotificationsPermission();
+  }
+
+  static Future<void> _ensureTimezoneInitialized() async {
+    if (_timezoneInitialized) {
+      return;
+    }
+
+    tz.initializeTimeZones();
+
+    final String deviceTz = DateTime.now().timeZoneName.trim();
+    final String resolved = _resolveTimezoneName(deviceTz);
+    try {
+      tz.setLocalLocation(tz.getLocation(resolved));
+    } catch (_) {
+      // Fallback to UTC if the device timezone name is unknown.
+      tz.setLocalLocation(tz.getLocation('UTC'));
+    }
+
+    _timezoneInitialized = true;
+  }
+
+  static String _resolveTimezoneName(String raw) {
+    if (raw.isEmpty) {
+      return 'UTC';
+    }
+
+    // Some platforms expose abbreviations that are not IANA IDs.
+    switch (raw.toUpperCase()) {
+      case 'CET':
+      case 'CEST':
+        return 'Europe/Madrid';
+      case 'GMT':
+      case 'UTC':
+        return 'UTC';
+      default:
+        return raw;
+    }
   }
 
   static Future<void> scheduleEventReminder(Event event) async {
