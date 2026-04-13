@@ -49,94 +49,108 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ),
         ],
       ),
-      body: TableCalendar<Event>(
-        firstDay: DateTime(2020, 1, 1),
-        lastDay: DateTime(2035, 12, 31),
-        focusedDay: _focusedDay,
-        calendarFormat: CalendarFormat.month,
-        selectedDayPredicate: (DateTime day) => isSameDay(day, _selectedDay),
-        eventLoader: eventsForDay,
-        onDaySelected: (DateTime selectedDay, DateTime focusedDay) {
-          setState(() {
-            _selectedDay = selectedDay;
-            _focusedDay = focusedDay;
-          });
-
-          _showDayDetailBottomSheet(context, selectedDay);
-        },
-        onPageChanged: (DateTime focusedDay) {
-          _focusedDay = focusedDay;
-        },
-        headerStyle: HeaderStyle(
-          titleTextStyle: Theme.of(context).textTheme.titleMedium ?? const TextStyle(),
-          formatButtonVisible: false,
-          titleCentered: true,
-          decoration: const BoxDecoration(),
-        ),
-        daysOfWeekStyle: DaysOfWeekStyle(
-          weekdayStyle:
-              Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.onSurfaceVariant) ??
-              const TextStyle(color: AppTheme.onSurfaceVariant),
-          weekendStyle:
-              Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.onSurfaceVariant) ??
-              const TextStyle(color: AppTheme.onSurfaceVariant),
-        ),
-        calendarStyle: CalendarStyle(
-          defaultTextStyle:
-              Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.onSurface) ??
-              const TextStyle(color: AppTheme.onSurface),
-          weekendTextStyle:
-              Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.secondary) ??
-              const TextStyle(color: AppTheme.secondary),
-          selectedDecoration: const BoxDecoration(
-            color: AppTheme.primary,
-            shape: BoxShape.circle,
-          ),
-          todayDecoration: const BoxDecoration(
-            color: AppTheme.primaryContainer,
-            shape: BoxShape.circle,
-          ),
-          markerDecoration: const BoxDecoration(
-            color: AppTheme.statusAmber,
-            shape: BoxShape.circle,
-          ),
-        ),
-        calendarBuilders: CalendarBuilders<Event>(
-          markerBuilder: (BuildContext context, DateTime date, List<Event> events) {
-            if (events.isEmpty) {
-              return const SizedBox.shrink();
-            }
-
-            return Positioned(
-              bottom: 4,
-              child: Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(color: AppTheme.statusAmber, shape: BoxShape.circle),
+      body: Column(
+        mainAxisSize: MainAxisSize.max,
+        children: <Widget>[
+          Expanded(
+            child: TableCalendar<Event>(
+              firstDay: DateTime(2020, 1, 1),
+              lastDay: DateTime(2035, 12, 31),
+              focusedDay: _focusedDay,
+              calendarFormat: CalendarFormat.month,
+              availableCalendarFormats: const <CalendarFormat, String>{
+                CalendarFormat.month: '',
+              },
+              selectedDayPredicate: (DateTime day) => isSameDay(day, _selectedDay),
+              eventLoader: eventsForDay,
+              onDaySelected: (DateTime selectedDay, DateTime focusedDay) {
+                setState(() {
+                  _selectedDay = selectedDay;
+                  _focusedDay = focusedDay;
+                });
+              },
+              onPageChanged: (DateTime focusedDay) {
+                _focusedDay = focusedDay;
+              },
+              headerStyle: HeaderStyle(
+                titleTextStyle: Theme.of(context).textTheme.titleMedium ?? const TextStyle(),
+                formatButtonVisible: false,
+                titleCentered: true,
+                decoration: const BoxDecoration(),
               ),
-            );
-          },
-        ),
-      ),
-    );
-  }
+              daysOfWeekStyle: DaysOfWeekStyle(
+                weekdayStyle:
+                    Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.onSurfaceVariant) ??
+                    const TextStyle(color: AppTheme.onSurfaceVariant),
+                weekendStyle:
+                    Theme.of(context).textTheme.labelLarge?.copyWith(color: AppTheme.onSurfaceVariant) ??
+                    const TextStyle(color: AppTheme.onSurfaceVariant),
+              ),
+              calendarStyle: CalendarStyle(
+                defaultTextStyle:
+                    Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.onSurface) ??
+                    const TextStyle(color: AppTheme.onSurface),
+                weekendTextStyle:
+                    Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.secondary) ??
+                    const TextStyle(color: AppTheme.secondary),
+                selectedDecoration: const BoxDecoration(
+                  color: AppTheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                todayDecoration: const BoxDecoration(
+                  color: AppTheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                markerDecoration: const BoxDecoration(
+                  color: AppTheme.statusAmber,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              calendarBuilders: CalendarBuilders<Event>(
+                markerBuilder: (BuildContext context, DateTime date, List<Event> events) {
+                  if (events.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
 
-  void _showDayDetailBottomSheet(BuildContext rootContext, DateTime day) {
-    showModalBottomSheet<void>(
-      context: rootContext,
-      isScrollControlled: true,
-      builder: (BuildContext context) {
-        return DayDetailBottomSheet(
-          date: day,
-          roleSlotRepository: _roleSlotRepository,
-        );
-      },
+                  return Positioned(
+                    bottom: 4,
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(color: AppTheme.statusAmber, shape: BoxShape.circle),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          Container(
+            height: 300,
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            ),
+            child: SingleChildScrollView(
+              child: SizedBox(
+                height: 300,
+                child: DayDetailPanel(
+                  date: _selectedDay,
+                  roleSlotRepository: _roleSlotRepository,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class DayDetailBottomSheet extends ConsumerWidget {
-  const DayDetailBottomSheet({
+class DayDetailPanel extends ConsumerWidget {
+  const DayDetailPanel({
     super.key,
     required this.date,
     required this.roleSlotRepository,
@@ -149,66 +163,55 @@ class DayDetailBottomSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final List<Event> dayEvents = ref.watch(eventsByDateProvider(date));
 
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.65,
-        child: Column(
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      _formatDate(date),
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+    return Column(
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  _formatDate(date),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: dayEvents.isEmpty
-                  ? _emptyState(context)
-                  : ListView.builder(
-                      itemCount: dayEvents.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        final Event event = dayEvents[index];
-                        final List<RoleSlot> slots = roleSlotRepository.getByEventId(event.id);
-                        final int confirmed =
-                            slots.where((RoleSlot s) => s.status == SlotStatus.confirmed).length;
-                        final int pending =
-                            slots.where((RoleSlot s) => s.status == SlotStatus.pending).length;
-                        final int uncovered =
-                            slots.where((RoleSlot s) => s.status == SlotStatus.uncovered).length;
-
-                        return ListTile(
-                          title: Text(event.title),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text('${event.startTime} - ${event.endTime} | ${event.venue}'),
-                              const SizedBox(height: 4),
-                              Text('Confirmados: $confirmed / Pendientes: $pending / Sin cubrir: $uncovered'),
-                            ],
-                          ),
-                          trailing: StatusChip.event(eventStatus: event.status),
-                          onTap: () {
-                            context.pop();
-                            context.go('/events/${event.id}');
-                          },
-                        );
-                      },
-                    ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+        Expanded(
+          child: dayEvents.isEmpty
+              ? _emptyState(context)
+              : SingleChildScrollView(
+                  child: Column(
+                    children: dayEvents.map((Event event) {
+                      final List<RoleSlot> slots = roleSlotRepository.getByEventId(event.id);
+                      final int confirmed =
+                          slots.where((RoleSlot s) => s.status == SlotStatus.confirmed).length;
+                      final int pending =
+                          slots.where((RoleSlot s) => s.status == SlotStatus.pending).length;
+                      final int uncovered =
+                          slots.where((RoleSlot s) => s.status == SlotStatus.uncovered).length;
+
+                      return ListTile(
+                        title: Text(event.title),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text('${event.startTime} - ${event.endTime} | ${event.venue}'),
+                            const SizedBox(height: 4),
+                            Text('Confirmados: $confirmed / Pendientes: $pending / Sin cubrir: $uncovered'),
+                          ],
+                        ),
+                        trailing: StatusChip.event(eventStatus: event.status),
+                        onTap: () {
+                          context.go('/events/${event.id}');
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 

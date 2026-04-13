@@ -312,6 +312,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
         TextEditingController(text: existing?.notes ?? '');
     SlotPriority selectedPriority = existing?.priority ?? SlotPriority.normal;
     TimeOfDay? selectedCallTime = _parseTime(existing?.callTime);
+    int quantity = 1;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -334,10 +335,47 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                     Text(
                       isEditing
                           ? 'Editar puesto'
-                          : l10n.eventsAddSlot,
+                          : (quantity == 1 ? 'Añadir puesto' : 'Añadir $quantity puestos'),
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 12),
+                    if (!isEditing) ...<Widget>[
+                      Text('Cantidad', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: <Widget>[
+                          IconButton(
+                            onPressed: quantity > 1
+                                ? () {
+                                    setLocalState(() {
+                                      quantity -= 1;
+                                    });
+                                  }
+                                : null,
+                            icon: const Icon(Icons.remove),
+                          ),
+                          SizedBox(
+                            width: 32,
+                            child: Text(
+                              '$quantity',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: quantity < 30
+                                ? () {
+                                    setLocalState(() {
+                                      quantity += 1;
+                                    });
+                                  }
+                                : null,
+                            icon: const Icon(Icons.add),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     Autocomplete<String>(
                       optionsBuilder: (TextEditingValue value) {
                         if (value.text.isEmpty) {
@@ -431,19 +469,37 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                               if (roleController.text.trim().isEmpty) {
                                 return;
                               }
-                              final RoleSlot slot = RoleSlot(
-                                id: existing?.id ?? _uuid.v4(),
-                                eventId: eventId,
-                                roleType: roleController.text.trim(),
-                                assignedEmployeeId: existing?.assignedEmployeeId,
-                                status: existing?.status ?? SlotStatus.uncovered,
-                                priority: selectedPriority,
-                                callTime: selectedCallTime == null ? null : _formatTime(selectedCallTime!),
-                                notes: notesController.text.trim().isEmpty
-                                    ? null
-                                    : notesController.text.trim(),
-                              );
-                              await _roleSlotRepository.save(slot);
+                              if (isEditing) {
+                                final RoleSlot slot = RoleSlot(
+                                  id: existing!.id,
+                                  eventId: eventId,
+                                  roleType: roleController.text.trim(),
+                                  assignedEmployeeId: existing.assignedEmployeeId,
+                                  status: existing.status,
+                                  priority: selectedPriority,
+                                  callTime: selectedCallTime == null ? null : _formatTime(selectedCallTime!),
+                                  notes: notesController.text.trim().isEmpty
+                                      ? null
+                                      : notesController.text.trim(),
+                                );
+                                await _roleSlotRepository.save(slot);
+                              } else {
+                                for (int i = 0; i < quantity; i += 1) {
+                                  final RoleSlot slot = RoleSlot(
+                                    id: _uuid.v4(),
+                                    eventId: eventId,
+                                    roleType: roleController.text.trim(),
+                                    assignedEmployeeId: null,
+                                    status: SlotStatus.uncovered,
+                                    priority: selectedPriority,
+                                    callTime: selectedCallTime == null ? null : _formatTime(selectedCallTime!),
+                                    notes: notesController.text.trim().isEmpty
+                                        ? null
+                                        : notesController.text.trim(),
+                                  );
+                                  await _roleSlotRepository.save(slot);
+                                }
+                              }
                               final Event? currentEvent =
                                   ref.read(eventsProvider.notifier).getById(eventId);
                               if (currentEvent != null) {

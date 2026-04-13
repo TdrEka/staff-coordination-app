@@ -95,20 +95,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
               const SectionHeader(title: 'Acciones rápidas'),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: <Widget>[
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: () => context.go('/events/add'),
-                      icon: const Icon(Icons.add),
-                      label: Text(l10n.homeAddEvent),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text(
+                        l10n.homeAddEvent,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: () => context.go('/availability'),
-                      icon: const Icon(Icons.person_search),
-                      label: Text(l10n.homeFindStaff),
+                      icon: const Icon(Icons.person_search, size: 18),
+                      label: Text(
+                        l10n.homeFindStaff,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                 ],
